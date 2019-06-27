@@ -1,4 +1,4 @@
-# Virgin Pulse Automation
+# Virgin Inactive
 
 ## What is this?
 This is a selenium based project that will automate logging into your Virgin Pulse account and complete tasks to give you points.
