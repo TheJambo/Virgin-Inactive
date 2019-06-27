@@ -1,4 +1,4 @@
-# Virgin Inactive
+![](http://james.am/inactiveheader.png)
 
 ## What is this?
 This is a selenium based project that will automate logging into your Virgin Pulse account and complete tasks to give you points.
