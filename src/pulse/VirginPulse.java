@@ -192,9 +192,18 @@ private static void createProperties() {
 		System.out.println("Logging into Whil.");
 		driver.get("https://connect.whil.com/virginpulsesso/redirect?destination=series&seriesUrl=https%3A%2F%2Fconnect.whil.com%2Fcms%2Fprograms%2Ffreemium%2Fseries%2Fthrive-mindfulness-101");
 		System.out.println("Opening Mindfulness course.");
-		driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101/sessions/focus-your-attention");
-		System.out.println("Resuming Mindfulness course");
-		clickIfPresent(By.xpath("//*[@id=\"root\"]/div/div[2]/div[2]/div/div[2]/div"), driver);
+
+		driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101?w");
+		
+		if (!driver.findElements(By.id("triggerCloseCurtain")).isEmpty()) {
+			System.out.println("Resuming Mindfulness course");
+			clickIfPresent(By.xpath("//*[@id=\"root\"]/div/div[2]/div[2]/div/div[2]/div"), driver);
+		}
+		else {
+			System.out.println("Starting Mindfulness course");
+			driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101/sessions/introduction-basics-with-kelly");
+		}
+		
 		System.out.println("Playing video");
 		driver.findElement(By.xpath("//*[@id=\"playerContainer\"]/div[2]/button")).click();		
 		Thread.sleep(300010); //play for 5 minutes
