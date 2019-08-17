@@ -25,8 +25,7 @@ public class VirginPulse {
 		driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS);
 
 		try {
-			
-			doFitbit(driver);
+			doMyFitnessPal(driver);
 			login(driver);
 			closeTrophies(driver);
 			closePopups(driver);
@@ -45,32 +44,36 @@ public class VirginPulse {
 		}
 	}
 	
-	private static void doFitbit(WebDriver driver) throws Exception {
-
-		driver.manage().timeouts().implicitlyWait(1, TimeUnit.SECONDS); //Loading times are OK for fitbit.
-		System.out.println("Opening Fitbit");
-		driver.get("https://www.fitbit.com/uk/login");
+	  public static void doMyFitnessPal(WebDriver driver) throws Exception {
+		  	driver.manage().timeouts().implicitlyWait(2, TimeUnit.SECONDS); //MFP can be slow.
+		    driver.get("https://www.myfitnesspal.com/account/login");
+		    driver.findElement(By.id("username")).click();
+		    driver.findElement(By.id("username")).clear();
+		    driver.findElement(By.id("username")).sendKeys(appProps.getProperty("MyFitnessPalEmail"));
+		    driver.findElement(By.id("password")).clear();
+		    driver.findElement(By.id("password")).sendKeys(appProps.getProperty("MyFitnessPalPassword"));
+		    driver.findElement(By.id("password")).sendKeys(Keys.RETURN);
+		    driver.get("https://www.myfitnesspal.com/food/diary");
+	    	int calories = Integer.valueOf(driver.findElement(By.xpath("(.//*[normalize-space(text()) and normalize-space(.)='Totals'])[1]/following::td[1]")).getText());
+		    if(calories == 0){
+		    	System.out.println("No calorie input found. Adding fake calories.");
+			    driver.findElement(By.linkText("Add Food")).click();
+			    driver.findElement(By.id("search")).click();
+			    driver.findElement(By.id("search")).clear();
+			    driver.findElement(By.id("search")).sendKeys("sugar");
+			    driver.findElement(By.xpath("(.//*[normalize-space(text()) and normalize-space(.)='Quick add calories'])[1]/following::input[4]")).click();
+			    driver.findElement(By.xpath("(.//*[normalize-space(text()) and normalize-space(.)='Sugar'])[1]/following::p[1]")).click();
+			    driver.findElement(By.xpath("(.//*[normalize-space(text()) and normalize-space(.)='To which meal?'])[2]/following::input[1]")).click();
+			    Thread.sleep(500);
+			    driver.get("https://www.myfitnesspal.com/food/diary");
+			    calories = Integer.valueOf(driver.findElement(By.xpath("(.//*[normalize-space(text()) and normalize-space(.)='Totals'])[1]/following::td[1]")).getText());
+			    System.out.println("Added " + calories + " calories.");
+			  }
+		    else
+		    	System.out.println("Found " + calories + " calories already. Skipping adding fake calories.");
+		  }
+		    
 		
-		driver.findElement(By.xpath("//*[@id=\"ember644\"]")).sendKeys(appProps.getProperty("FitbitEmail"));
-		driver.findElement(By.xpath("//*[@id=\"ember645\"]")).sendKeys(appProps.getProperty("FitbitPassword"));
-		clickIfPresent(By.id("ember685"), driver);	
-		System.out.println("Logged In!");
-		driver.get("https://www.fitbit.com/foods/log");
-		
-		Thread.sleep(1000);
-		driver.findElement(By.xpath("//*[@id=\"foodselectinput\"]")).sendKeys("Sugar");
-		Thread.sleep(1000);
-		driver.findElement(By.xpath("//*[@id=\"foodselectinput\"]")).sendKeys(Keys.RETURN);
-		Thread.sleep(1000);
-		driver.findElement(By.xpath("//*[@id=\"quantityselectinput\"]")).sendKeys(Keys.RETURN); //1tbsp
-		Thread.sleep(1000);
-		driver.findElement(By.xpath("//*[@id=\"foodAutoCompButton\"]")).click(); //Confirm your sugar
-		Thread.sleep(1000);
-		System.out.println("Calories logged!");
-		driver.manage().timeouts().implicitlyWait(500, TimeUnit.MILLISECONDS); //We're using the same page the entire loop, no need to wait.
-		driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS); //Back to slow loads :(
-	}
-	
 	private static void doHabits(WebDriver driver) throws Exception {
 		List<String> habits = Arrays.asList("713", "642", "13", "44", "687", "684", "42", "43", "691", "685", "690", "688", "9", "689","692","686","4", "678" );
 
@@ -156,8 +159,10 @@ private static void createProperties() {
     AppProps.setProperty("EmailLogin", "username@domain.tld");
     AppProps.setProperty("Password", "ThisIsMySecurePassword");
     AppProps.setProperty("ChromeDriverLocation", "C:\\chromedriver.exe");
-    AppProps.setProperty("FitbitEmail", "username@domain.tld");
-    AppProps.setProperty("FitbitPassword", "ThisIsMySecureFitbitPassword");
+    AppProps.setProperty("MyFitnessPalEmail", "username@domain.tld");
+    AppProps.setProperty("MyFitnessPalPassword", "ThisIsMySecureFitbitPassword");
+    AppProps.setProperty("MindfulnessVideo", "0");
+
 
     Path PropertyFile = Paths.get("application.properties");
       
@@ -187,26 +192,56 @@ private static void createProperties() {
 			Thread.sleep(2500);
 		}
 	}
-	private static void doWhil(WebDriver driver) throws Exception { 
+	
+	private static void doWhil(WebDriver driver) throws Exception { //This section assumes that mindfulness is the last course you've opened.
+		String lastVideo = appProps.getProperty("MindfulnessVideo");
+		System.out.println("Last video played was #" + lastVideo);
 		driver.manage().timeouts().implicitlyWait(15, TimeUnit.SECONDS); //Whil is so slow, I think the actual medidation is meant to be during loads.
 		System.out.println("Logging into Whil.");
 		driver.get("https://connect.whil.com/virginpulsesso/redirect?destination=series&seriesUrl=https%3A%2F%2Fconnect.whil.com%2Fcms%2Fprograms%2Ffreemium%2Fseries%2Fthrive-mindfulness-101");
 		System.out.println("Opening Mindfulness course.");
-
 		driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101?w");
 		
-		if (!driver.findElements(By.id("triggerCloseCurtain")).isEmpty()) {
+		if (!driver.findElements(By.id("triggerCloseCurtain")).isEmpty()) { //If we're mid-course, keep going.
 			System.out.println("Resuming Mindfulness course");
 			clickIfPresent(By.xpath("//*[@id=\"root\"]/div/div[2]/div[2]/div/div[2]/div"), driver);
 		}
-		else {
+		else { //If we're not mid course, do dis.
 			System.out.println("Starting Mindfulness course");
-			driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101/sessions/introduction-basics-with-kelly");
-		}
+			switch (lastVideo) {
+			case "0": playWhil("introduction-basics-with-kelly", 240000, driver); //240s for both the intro and first one.
+					appProps.setProperty("MindfulnessVideo", "2"); break;
+			case "1": playWhil("focus-your-attention", 120000, driver); //We shouldn't ever have to do this one.
+					appProps.setProperty("MindfulnessVideo", "2"); break;
+			case "2": playWhil("set-intention", 320000, driver);
+					appProps.setProperty("MindfulnessVideo", "3"); break;
+			case "3": playWhil("mindfulness-of-breath", 320000,  driver);
+					appProps.setProperty("MindfulnessVideo", "4"); break;
+			case "4": playWhil("sense-the-body", 320000, driver);
+					appProps.setProperty("MindfulnessVideo", "5"); break;
+			case "5": playWhil("recognize-and-release-thoughts", 320000, driver);
+					appProps.setProperty("MindfulnessVideo", "6"); break;
+			case "6": playWhil("welcome-emotions", 320000, driver);
+					appProps.setProperty("MindfulnessVideo", "7"); break;
+			case "7": playWhil("relax-the-nervous-system", 320000, driver);
+					appProps.setProperty("MindfulnessVideo", "8"); 			//No break here, finish it up so we complete it once a week.
+			case "8": playWhil("takeaways-basics-with-mark", 70, driver);
+					appProps.setProperty("MindfulnessVideo", "0"); break;
+			}
 		
 		System.out.println("Playing video");
 		driver.findElement(By.xpath("//*[@id=\"playerContainer\"]/div[2]/button")).click();		
-		Thread.sleep(300010); //play for 5 minutes
+		Thread.sleep(310000); //play for 5 minutes
+		System.out.println("Video Played. Time to leave.");
+		}
+	}
+	
+	private static void playWhil(String video, int time, WebDriver driver) throws Exception {
+		driver.get("https://connect.whil.com/goaltags/freemium-mindfulness-101/sessions/" + video);
+		System.out.println("Opening https://connect.whil.com/goaltags/freemium-mindfulness-101/sessions/" + video);
+		System.out.println("Playing video");
+		driver.findElement(By.xpath("//*[@id=\"playerContainer\"]/div[2]/button")).click();		
+		Thread.sleep(time);
 		System.out.println("Video Played. Time to leave.");
 	}
 	
