@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.Properties;
@@ -27,21 +29,23 @@ public class VirginPulse {
 	public static void main(String[] args) throws Exception {
 		loadProperties();
 
-		String LastRunDate = appProps.getProperty("LastRunDate");
+		Date LastRun = new SimpleDateFormat("yyyy-MM-dd").parse(appProps.getProperty("LastRunDate"));  
+		
+		System.out.println("Last Run Date: " + LastRun);
+		System.out.println(	"Todays Date: " + new Date());
 
-		System.out.println(
-				"Todays Date:" + DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH).format(LocalDateTime.now()));
-
-		System.out.println("Last Run Date: " + LastRunDate);
-
-		if (new SimpleDateFormat("yyyy-MM-dd").parse(LastRunDate).before(new Date())) {
+		if (LastRun.before(new Date())) {
 
 			WebDriver driver = new ChromeDriver();
 			driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS);
 
 			try {
+				try {
+					doMyFitnessPal(driver);
+				} catch (ElementNotInteractableException e) {
+					System.out.println(e.toString());
+				}
 
-				doMyFitnessPal(driver);
 				login(driver);
 				closeTrophies(driver);
 				closePopups(driver);
@@ -52,7 +56,7 @@ public class VirginPulse {
 				String NewLastRunDate = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH)
 						.format(LocalDateTime.now());
 				System.out.println("Ran successfully. Setting last run date to: " + NewLastRunDate);
-				appProps.setProperty("LastRunDate", NewLastRunDate);
+				setProperty("LastRunDate", NewLastRunDate);
 
 			}
 
@@ -70,14 +74,45 @@ public class VirginPulse {
 			System.out.println("Already ran today.");
 		}
 	}
+/** 
+ * This is needed to use MyFitnessPal, without it, some horrible iFrame will stay
+ * in front of the window the whole time.
+ * 
+ * You can't add a cookie without navigating to a page first, so a refresh is needed to make the change apply.
+ * 
+ * @param driver
+ */
+	public static void addMFPCookie(WebDriver driver) {
+		@SuppressWarnings("deprecation")
+		
+		Cookie cookie = new Cookie.Builder("notice_preferences", "2:").domain(".myfitnesspal.com")
+				.expiresOn(new Date(2022, 10, 28)).isHttpOnly(false).isSecure(false).path("/").build();
+
+		driver.manage().addCookie(cookie);
+		driver.navigate().refresh();
+
+	}
 
 	public static void doSlack(WebDriver driver) throws Exception {
 		driver.manage().timeouts().implicitlyWait(2, TimeUnit.SECONDS); // MFP can be slow.
 		System.out.println("Getting results");
 		driver.get("https://app.member.virginpulse.com/#/statement");
+		System.out.println("Opened Statement.");
+		System.out.println(driver.getCurrentUrl());
+		Thread.sleep(1000);
+
+		if (!driver
+				.findElements(By.xpath(
+						"//*[@id=\"statement-points-tab-content\"]/div[1]/div[2]/div[1]/div/div[1]/div[2]/span[2]"))
+				.isEmpty()) { // If we're mid-course, keep going.
+			System.out.println("Couldn't find Statement. Logging in again.");
+			login(driver);
+		}
+		System.out.println("Statement found.");
+		Thread.sleep(2000);
 		String TodaysPoints = driver
 				.findElement(By.xpath(
-						"(.//*[normalize-space(text()) and normalize-space(.)='Total Points'])[1]/following::span[1]"))
+						"//*[@id=\"statement-points-tab-content\"]/div[1]/div[2]/div[1]/div/div[1]/div[2]/span[2]"))
 				.getText();
 		String YesterdaysPoints = driver
 				.findElement(By.xpath(
@@ -91,39 +126,38 @@ public class VirginPulse {
 		int DaysLeftNumber = Integer.valueOf(DaysLeft.substring(0, 2));
 		System.out.println(DaysLeftNumber);
 		String message = "{\"username\":\"Virgin Inactive Report\","
-				+ " \"icon_url\": \"https://james.am/VirginInactive.png\",\n" + "    \"attachments\": [\n {\n "
-				+ "\"fallback\": \"Virgin inactive has added " + TodaysPoints + " points today.\",\n  " // This will
-																										// show up in
-																										// the
-																										// notification
-				+ "\"color\": \"#2eb886\",\n "
-//		  		+ "\"author_name\": \"Points Report\",\n "
-//		  		+ "\"author_link\": \"http://flickr.com/bobby/\",\n "
-//		  		+ "\"author_icon\": \"http://flickr.com/icons/bobby.jpg\",\n "
-//		  		+ "\"title\": \"Slack API Documentation\",\n "
-//		  		+ "\"title_link\": \"https://api.slack.com/\",\n  "
-				+ "\"text\": \"Virgin Inactive has successfully run.\",\n  " + "\"fields\": [\n " + "{\n "
-				+ "\"title\": \"Points added so far today:\",\n  " + "\"value\": \"" + TodaysPoints + "\",\n  "
-				+ "\"short\": false\n " + "}, " + "{\n " + "\"title\": \"Points gained yesterday:\",\n  "
-				+ "\"value\": \"" + YesterdaysPoints + "\",\n  " + "\"short\": false\n " + "}, " + "{\n "
-				+ "\"title\": \"Points this Quarter:\",\n  " + "\"value\": \"" + TotalPoints
-				+ " out of 20,000 points. (" + Integer.valueOf(TotalPoints) / 200 + "%) \",\n  " + "\"short\": false\n "
-				+ "}, " + "{\n " + "\"title\": \"Days remaining:\",\n  " + "\"value\": \"" + DaysLeft + " ("
-				+ Math.round(DaysLeftNumber / 0.9D) + "%)" + "\",\n  " + "\"short\": false\n " + "} "
-				+ "            ],\n  "
-//		  		+ "\"image_url\": \"http://my-website.com/path/to/image.jpg\",\n  "
-//		  		+ "\"thumb_url\": \"http://example.com/path/to/thumb.png\",\n "
+				+ " \"icon_url\": \"https://james.am/VirginInactive.png\",\n" 
+				+ " \"attachments\": [\n {\n "
+				+ "\"fallback\": \"Virgin inactive has added " + TodaysPoints + " points today.\",\n  "
+				+ "\"color\": \"#2eb886\",\n " 
+				+ "\"text\": \"Virgin Inactive has successfully run.\",\n  "
+				+ "\"fields\": [\n " + "{\n " 
+				+ "\"title\": \"Points added so far today:\",\n  " 
+				+ "\"value\": \"" + TodaysPoints + "\",\n  " 
+				+ "\"short\": false\n " + "}, " 
+				+ "{\n "
+				+ "\"title\": \"Points gained yesterday:\",\n  " 
+				+ "\"value\": \"" + YesterdaysPoints + "\",\n  "
+				+ "\"short\": false\n " 
+				+ "}, " 
+				+ "{\n " 
+				+ "\"title\": \"Points this Quarter:\",\n  " 
+				+ "\"value\": \"" + TotalPoints + " out of 20,000 points. (" + Integer.valueOf(TotalPoints) / 200 + "%) \",\n  "
+				+ "\"short\": false\n " 
+				+ "}, " 
+				+ "{\n " 
+				+ "\"title\": \"Days remaining:\",\n  " 
+				+ "\"value\": \"" + DaysLeft + " (" + Math.round(DaysLeftNumber / 0.9D) + "%)" 
+				+ "\",\n  " + "\"short\": false\n " + "} "
+				+ "            ],\n  " 
 				+ "\"footer\": \"Virgin Inactive\",\n   "
-				+ "\"footer_icon\": \"https://james.am/VirginInactive.png\",\n   "
-//		  		+ "\"ts\": 123456789\n        "
+				+ "\"footer_icon\": \"https://james.am/VirginInactive.png\",\n   " 
 				+ "}\n    ]\n}";
 
 		String SlackHookURL = appProps.getProperty("SlackHookURL");
 		@SuppressWarnings("unused")
 		HttpResponse<String> response = Unirest.post(SlackHookURL).header("content-type", "application/json")
 				.header("cache-control", "no-cache").body(message).asString();
-
-		System.out.println("Sending Report:" + message);
 		System.out.println("Report sent. Time to leave.");
 
 	}
@@ -131,7 +165,7 @@ public class VirginPulse {
 	public static void doMyFitnessPal(WebDriver driver) throws Exception {
 		driver.manage().timeouts().implicitlyWait(2, TimeUnit.SECONDS); // MFP can be slow.
 		driver.get("https://www.myfitnesspal.com/account/login");
-		Thread.sleep(3000);
+		addMFPCookie(driver);
 		clickIfPresent(By.xpath("/html/body/div[8]/div[1]/div/div[2]/div[2]/a[1]"), driver);
 		driver.findElement(By.id("username")).click();
 		driver.findElement(By.id("username")).clear();
@@ -200,16 +234,19 @@ public class VirginPulse {
 	}
 
 	private static void login(WebDriver driver) throws Exception {
+
 		System.out.println("Attempting to log in.");
 		driver.get(
 				"https://iam.virginpulse.com/auth/realms/virginpulse/protocol/openid-connect/auth?client_id=genesis-ui&redirect_uri=https%3A%2F%2Fapp.member.virginpulse.com%2F%3Fredirect_fragment%3D%252Fhome&state=9c3aedca-d8f1-4846-b583-6498ff108e15&nonce=d61e2ef3-65bb-4928-b165-35f9014fb6f6&response_mode=fragment&response_type=code&scope=openid");
 		Thread.sleep(1000);
-		driver.findElement(By.id("kc-form-wrapper")).click(); // Focus the username field
-		driver.findElement(By.id("username")).sendKeys(appProps.getProperty("EmailLogin"));
-		driver.findElement(By.id("password")).sendKeys(appProps.getProperty("Password"));
-		clickIfPresent(By.id("kc-login"), driver);
-		Thread.sleep(10000);
-		System.out.println("No trophies to close.");
+		if (!driver.findElements(By.id("kc-form-wrapper")).isEmpty()) { // Only login if the login screen is present.
+			driver.findElement(By.id("kc-form-wrapper")).click(); // Focus the username field
+			driver.findElement(By.id("username")).sendKeys(appProps.getProperty("EmailLogin"));
+			driver.findElement(By.id("password")).sendKeys(appProps.getProperty("Password"));
+			clickIfPresent(By.id("kc-login"), driver);
+			Thread.sleep(10000);
+			System.out.println("No trophies to close.");
+		}
 	}
 
 	private static void closeTrophies(WebDriver driver) throws Exception {
@@ -274,6 +311,18 @@ public class VirginPulse {
 		}
 	}
 
+	private static void setProperty(String key, String value) throws IOException {
+		FileInputStream in = new FileInputStream("application.properties");
+		Properties props = new Properties();
+		props.load(in);
+		in.close();
+
+		FileOutputStream out = new FileOutputStream("application.properties");
+		props.setProperty(key, value);
+		props.store(out, null);
+		out.close();
+	}
+
 	private static void clickIfPresent(By by, WebDriver driver) throws Exception {
 		List<WebElement> Elements = driver.findElements(by);
 		for (WebElement Element : Elements) {
@@ -306,44 +355,42 @@ public class VirginPulse {
 			switch (lastVideo) {
 			case "0":
 				playWhil("introduction-basics-with-kelly", 240000, driver); // 240s for both the intro and first one.
-				appProps.setProperty("MindfulnessVideo", "2");
+				setProperty("MindfulnessVideo", "2");
 				break;
 			case "1":
 				playWhil("focus-your-attention", 120000, driver); // We shouldn't ever have to do this one.
-				appProps.setProperty("MindfulnessVideo", "2");
+				setProperty("MindfulnessVideo", "2");
 				break;
 			case "2":
 				playWhil("set-intention", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "3");
+				setProperty("MindfulnessVideo", "3");
 				break;
 			case "3":
 				playWhil("mindfulness-of-breath", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "4");
+				setProperty("MindfulnessVideo", "4");
 				break;
 			case "4":
 				playWhil("sense-the-body", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "5");
+				setProperty("MindfulnessVideo", "5");
 				break;
 			case "5":
 				playWhil("recognize-and-release-thoughts", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "6");
+				setProperty("MindfulnessVideo", "6");
 				break;
 			case "6":
 				playWhil("welcome-emotions", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "7");
+				setProperty("MindfulnessVideo", "7");
 				break;
 			case "7":
 				playWhil("relax-the-nervous-system", 320000, driver);
-				appProps.setProperty("MindfulnessVideo", "8"); // No break here, finish it up so we complete it once a
-																// week.
+				setProperty("MindfulnessVideo", "8"); // No break here, finish it up so we complete it once a
+														// week.
 			case "8":
-				playWhil("takeaways-basics-with-mark", 70, driver);
-				appProps.setProperty("MindfulnessVideo", "0");
+				playWhil("takeaways-basics-with-mark", 70000, driver);
+				setProperty("MindfulnessVideo", "0");
 				break;
 			}
 
-			System.out.println("Playing video");
-			driver.findElement(By.xpath("//*[@id=\"playerContainer\"]/div[2]/button")).click();
 			Thread.sleep(310000); // play for 5 minutes
 			System.out.println("Video Played. Time to leave.");
 		}
