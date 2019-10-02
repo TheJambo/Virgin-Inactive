@@ -30,11 +30,15 @@ public class VirginPulse {
 		loadProperties();
 
 		Date LastRun = new SimpleDateFormat("yyyy-MM-dd").parse(appProps.getProperty("LastRunDate"));  
+		Date CurrentDate = new SimpleDateFormat("yyyy-MM-dd").parse(LocalDateTime.now().toString());  
+		String NewLastRunDate = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH)
+				.format(LocalDateTime.now());
 		
 		System.out.println("Last Run Date: " + LastRun);
-		System.out.println(	"Todays Date: " + new Date());
+		System.out.println(	"Todays Date: " + CurrentDate);
+		System.out.println(	"NewLastRunDate Date: " + NewLastRunDate);
 
-		if (LastRun.before(new Date())) {
+		if (LastRun.before(CurrentDate)) {
 
 			WebDriver driver = new ChromeDriver();
 			driver.manage().timeouts().implicitlyWait(3, TimeUnit.SECONDS);
@@ -53,8 +57,7 @@ public class VirginPulse {
 				doHabits(driver);
 				doWhil(driver);
 				doSlack(driver);
-				String NewLastRunDate = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.ENGLISH)
-						.format(LocalDateTime.now());
+				
 				System.out.println("Ran successfully. Setting last run date to: " + NewLastRunDate);
 				setProperty("LastRunDate", NewLastRunDate);
 
@@ -98,18 +101,7 @@ public class VirginPulse {
 		System.out.println("Getting results");
 		driver.get("https://app.member.virginpulse.com/#/statement");
 		System.out.println("Opened Statement.");
-		System.out.println(driver.getCurrentUrl());
-		Thread.sleep(1000);
-
-		if (!driver
-				.findElements(By.xpath(
-						"//*[@id=\"statement-points-tab-content\"]/div[1]/div[2]/div[1]/div/div[1]/div[2]/span[2]"))
-				.isEmpty()) { // If we're mid-course, keep going.
-			System.out.println("Couldn't find Statement. Logging in again.");
-			login(driver);
-		}
-		System.out.println("Statement found.");
-		Thread.sleep(2000);
+		Thread.sleep(10000);
 		String TodaysPoints = driver
 				.findElement(By.xpath(
 						"//*[@id=\"statement-points-tab-content\"]/div[1]/div[2]/div[1]/div/div[1]/div[2]/span[2]"))
@@ -121,7 +113,7 @@ public class VirginPulse {
 		String TotalPoints = driver.findElement(By.id("progress-bar-menu-points-total-value")).getText();
 		driver.get("https://app.member.virginpulse.com/#/rewards/earn");
 		String DaysLeft = driver.findElement(By.xpath(
-				"(.//*[normalize-space(text()) and normalize-space(.)='Program Reminder'])[1]/following::span[1]"))
+				"//*[@id=\"earn-tabpanel\"]/div[3]/span[1]"))
 				.getText();
 		int DaysLeftNumber = Integer.valueOf(DaysLeft.substring(0, 2));
 		System.out.println(DaysLeftNumber);
@@ -147,7 +139,7 @@ public class VirginPulse {
 				+ "}, " 
 				+ "{\n " 
 				+ "\"title\": \"Days remaining:\",\n  " 
-				+ "\"value\": \"" + DaysLeft + " (" + Math.round(DaysLeftNumber / 0.9D) + "%)" 
+				+ "\"value\": \"" + DaysLeft + " (" + Math.round(DaysLeftNumber / 0.7D) + "%)" 
 				+ "\",\n  " + "\"short\": false\n " + "} "
 				+ "            ],\n  " 
 				+ "\"footer\": \"Virgin Inactive\",\n   "
