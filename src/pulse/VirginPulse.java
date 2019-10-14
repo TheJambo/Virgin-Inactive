@@ -237,6 +237,7 @@ public class VirginPulse {
 			driver.findElement(By.id("password")).sendKeys(appProps.getProperty("Password"));
 			clickIfPresent(By.id("kc-login"), driver);
 			Thread.sleep(10000);
+			clickIfPresent(By.xpath("/html/body/cookie-banner/div/div/button"), driver);
 			System.out.println("No trophies to close.");
 		}
 	}
